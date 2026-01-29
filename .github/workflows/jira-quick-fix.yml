@@ -1,0 +1,37 @@
+name: Quick Fix Jira Issue
+
+on:
+  repository_dispatch:
+    types: [jira-issue-created]
+
+jobs:
+  quick-fix:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Parse Jira Payload
+        run: |
+          echo "JIRA ISSUE KEY: ${{ github.event.client_payload.issue_key }}"
+          echo "JIRA SUMMARY: ${{ github.event.client_payload.summary }}"
+
+      - name: Apply Quick Fix
+        run: |
+          # Example: append a comment to README as a placeholder quick fix
+          echo "# Quick fix for ${{ github.event.client_payload.issue_key }}" >> README.md
+          git config user.name "github-actions"
+          git config user.email "actions@github.com"
+          git checkout -b quick-fix-${{ github.event.client_payload.issue_key }}
+          git add README.md
+          git commit -m "Quick fix for ${{ github.event.client_payload.issue_key }}"
+          git push origin HEAD
+
+      - name: Create Pull Request
+        uses: peter-evans/create-pull-request@v5
+        with:
+          token: ${{ secrets.GH_TOKEN }}
+          commit-message: "Quick fix for ${{ github.event.client_payload.issue_key }}"
+          title: "Quick fix: ${{ github.event.client_payload.summary }}"
+          body: "Automated quick fix generated from Jira issue."
