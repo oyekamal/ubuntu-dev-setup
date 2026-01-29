@@ -2,6 +2,10 @@
 
 set -eu  # Exit on error and undefined variables
 
+# Ensure required environment variables are set
+: "${USER:=$(whoami)}"
+: "${HOME:=$(eval echo ~$USER)}"
+
 # Color codes for output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -59,7 +63,7 @@ sudo apt-get install -y \
 print_status "Ensuring Git is installed..."
 sudo apt-get install -y git
 
-# Configure Git with recommended settings
+# Configure Git with recommended settings (safe to run multiple times)
 git config --global init.defaultBranch main 2>/dev/null || true
 
 # Install Python 3 and pip
@@ -227,17 +231,13 @@ fi
 print_status "Installing k9s..."
 if ! command -v k9s &> /dev/null; then
     K9S_VERSION=$(curl -s https://api.github.com/repos/derailed/k9s/releases/latest | grep -Po '"tag_name": "v\K[^"]*' || echo "0.32.4")
-    if [ -z "$K9S_VERSION" ]; then
-        K9S_VERSION="0.32.4"
-        print_warning "Failed to fetch latest k9s version, using fallback: v${K9S_VERSION}"
-    fi
     
     ARCH=$(uname -m)
     case $ARCH in
         x86_64)
             K9S_ARCH="amd64"
             ;;
-        aarch64|arm64)
+        aarch64|arm64)  # arm64 included for compatibility
             K9S_ARCH="arm64"
             ;;
         *)
@@ -264,17 +264,13 @@ fi
 print_status "Installing yq..."
 if ! command -v yq &> /dev/null; then
     YQ_VERSION=$(curl -s https://api.github.com/repos/mikefarah/yq/releases/latest | grep -Po '"tag_name": "v\K[^"]*' || echo "4.40.5")
-    if [ -z "$YQ_VERSION" ]; then
-        YQ_VERSION="4.40.5"
-        print_warning "Failed to fetch latest yq version, using fallback: v${YQ_VERSION}"
-    fi
     
     ARCH=$(uname -m)
     case $ARCH in
         x86_64)
             YQ_ARCH="amd64"
             ;;
-        aarch64|arm64)
+        aarch64|arm64)  # arm64 included for compatibility
             YQ_ARCH="arm64"
             ;;
         *)
