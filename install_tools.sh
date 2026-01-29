@@ -1,6 +1,6 @@
 #!/bin/bash
 
-set -e  # Exit on error
+set -eu  # Exit on error and undefined variables
 
 # Color codes for output
 RED='\033[0;31m'
@@ -161,10 +161,11 @@ else
 fi
 
 # Install kubectl (Kubernetes CLI)
+# Note: Using v1.30 stable channel. Update this periodically for newer versions.
 print_status "Installing kubectl..."
 if ! command -v kubectl &> /dev/null; then
-    curl -fsSL https://pkgs.k8s.io/core:/stable:/v1.29/deb/Release.key | sudo gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg
-    echo 'deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/v1.29/deb/ /' | sudo tee /etc/apt/sources.list.d/kubernetes.list
+    curl -fsSL https://pkgs.k8s.io/core:/stable:/v1.30/deb/Release.key | sudo gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg
+    echo 'deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/v1.30/deb/ /' | sudo tee /etc/apt/sources.list.d/kubernetes.list
     sudo apt-get update -y
     sudo apt-get install -y kubectl
 else
@@ -185,7 +186,15 @@ fi
 # Install AWS CLI v2
 print_status "Installing AWS CLI v2..."
 if ! command -v aws &> /dev/null; then
-    curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+    ARCH=$(uname -m)
+    if [ "$ARCH" = "x86_64" ]; then
+        curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+    elif [ "$ARCH" = "aarch64" ]; then
+        curl "https://awscli.amazonaws.com/awscli-exe-linux-aarch64.zip" -o "awscliv2.zip"
+    else
+        print_warning "AWS CLI may not support architecture: $ARCH, attempting x86_64..."
+        curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+    fi
     unzip -q awscliv2.zip
     sudo ./aws/install
     rm -rf aws awscliv2.zip
@@ -204,7 +213,9 @@ fi
 # Install Google Cloud SDK
 print_status "Installing Google Cloud SDK..."
 if ! command -v gcloud &> /dev/null; then
-    echo "deb [signed-by=/usr/share/keyrings/cloud.google.gpg] https://packages.cloud.google.com/apt cloud-sdk main" | sudo tee -a /etc/apt/sources.list.d/google-cloud-sdk.list
+    if [ ! -f /etc/apt/sources.list.d/google-cloud-sdk.list ]; then
+        echo "deb [signed-by=/usr/share/keyrings/cloud.google.gpg] https://packages.cloud.google.com/apt cloud-sdk main" | sudo tee /etc/apt/sources.list.d/google-cloud-sdk.list
+    fi
     curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | sudo gpg --dearmor -o /usr/share/keyrings/cloud.google.gpg
     sudo apt-get update -y
     sudo apt-get install -y google-cloud-cli
@@ -215,8 +226,27 @@ fi
 # Install k9s (Kubernetes CLI manager)
 print_status "Installing k9s..."
 if ! command -v k9s &> /dev/null; then
-    K9S_VERSION=$(curl -s https://api.github.com/repos/derailed/k9s/releases/latest | grep -Po '"tag_name": "v\K[^"]*')
-    curl -sL "https://github.com/derailed/k9s/releases/download/v${K9S_VERSION}/k9s_Linux_amd64.tar.gz" | sudo tar xz -C /usr/local/bin k9s
+    K9S_VERSION=$(curl -s https://api.github.com/repos/derailed/k9s/releases/latest | grep -Po '"tag_name": "v\K[^"]*' || echo "0.32.4")
+    if [ -z "$K9S_VERSION" ]; then
+        K9S_VERSION="0.32.4"
+        print_warning "Failed to fetch latest k9s version, using fallback: v${K9S_VERSION}"
+    fi
+    
+    ARCH=$(uname -m)
+    case $ARCH in
+        x86_64)
+            K9S_ARCH="amd64"
+            ;;
+        aarch64|arm64)
+            K9S_ARCH="arm64"
+            ;;
+        *)
+            print_warning "Unsupported architecture for k9s: $ARCH, attempting amd64..."
+            K9S_ARCH="amd64"
+            ;;
+    esac
+    
+    curl -sL "https://github.com/derailed/k9s/releases/download/v${K9S_VERSION}/k9s_Linux_${K9S_ARCH}.tar.gz" | sudo tar xz -C /usr/local/bin k9s
     sudo chmod +x /usr/local/bin/k9s
 else
     print_warning "k9s already installed, skipping..."
@@ -233,8 +263,27 @@ fi
 # Install yq (YAML processor)
 print_status "Installing yq..."
 if ! command -v yq &> /dev/null; then
-    YQ_VERSION=$(curl -s https://api.github.com/repos/mikefarah/yq/releases/latest | grep -Po '"tag_name": "v\K[^"]*')
-    sudo wget -qO /usr/local/bin/yq "https://github.com/mikefarah/yq/releases/download/v${YQ_VERSION}/yq_linux_amd64"
+    YQ_VERSION=$(curl -s https://api.github.com/repos/mikefarah/yq/releases/latest | grep -Po '"tag_name": "v\K[^"]*' || echo "4.40.5")
+    if [ -z "$YQ_VERSION" ]; then
+        YQ_VERSION="4.40.5"
+        print_warning "Failed to fetch latest yq version, using fallback: v${YQ_VERSION}"
+    fi
+    
+    ARCH=$(uname -m)
+    case $ARCH in
+        x86_64)
+            YQ_ARCH="amd64"
+            ;;
+        aarch64|arm64)
+            YQ_ARCH="arm64"
+            ;;
+        *)
+            print_warning "Unsupported architecture for yq: $ARCH, attempting amd64..."
+            YQ_ARCH="amd64"
+            ;;
+    esac
+    
+    sudo wget -qO /usr/local/bin/yq "https://github.com/mikefarah/yq/releases/download/v${YQ_VERSION}/yq_linux_${YQ_ARCH}"
     sudo chmod +x /usr/local/bin/yq
 else
     print_warning "yq already installed, skipping..."
