@@ -106,6 +106,16 @@ chmod +x install_tools.sh
 - All cloud CLIs (AWS, Azure, GCP) are installed for maximum flexibility
 - Zsh with Oh My Zsh provides an enhanced terminal experience
 - The script is idempotent - safe to run multiple times
+- Architecture detection supports both x86_64 and ARM64 systems
+- Some installations (Node.js, Helm, Azure CLI, Oh My Zsh) use piped curl commands for convenience. These execute official installation scripts from trusted sources over HTTPS.
+
+## Security Considerations
+
+While this script prioritizes convenience, be aware that:
+- Some tools are installed via piped curl commands that execute remote scripts
+- All sources use HTTPS for secure connections
+- Scripts are from official, trusted sources (NodeSource, Microsoft, HashiCorp, etc.)
+- For maximum security in production environments, consider downloading and reviewing scripts before execution
 
 ## Customization
 
